@@ -33,7 +33,7 @@ def safe_request(url):
         return []
         
 def get_today_news():
-    url = f"https://api.tradingeconomics.com/calendar?c={API_KEY}"
+    url = f"https://api.tradingeconomics.com/calendar/country/all?c={API_KEY}"
     data = safe_request(url)
     
     today = datetime.now(tz).date()
@@ -54,7 +54,7 @@ def get_today_news():
 
 
 def get_holidays():
-    url = f"https://api.tradingeconomics.com/holiday?c={API_KEY}"
+    url = f"https://api.tradingeconomics.com/calendar/country/all?c={API_KEY}"
     data = safe_request(url)
 
     today = datetime.now(tz).date()
@@ -101,7 +101,7 @@ def check_releases():
 
     while True:
         try:
-            url = f"https://api.tradingeconomics.com/calendar?c={API_KEY}"
+            url = f"https://api.tradingeconomics.com/calendar/country/all?c={API_KEY}"
             data = safe_request(url)
 
             now = datetime.now(tz)
@@ -135,11 +135,11 @@ def check_releases():
                         bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
                         sent.add(key)
 
-            time.sleep(60)
+            time.sleep(120)
 
         except Exception as e:
             print("Error:", e)
-            time.sleep(60)
+            time.sleep(120)
             
 def scheduler():
     last_sent = None
