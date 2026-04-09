@@ -1,172 +1,145 @@
 import requests
+from bs4 import BeautifulSoup
 import time
 from datetime import datetime
 import pytz
 import telebot
 
-# === НАСТРОЙКИ ===
 TOKEN = "8628795213:AAFET0_j5JCXzJn7lf1gJ114GVil5vuZtyY"
-API_KEY = "f6759ba66c1a4d9:0j77bu0f2f7hail"
 CHAT_ID = "536264248"
 
 bot = telebot.TeleBot(TOKEN)
 tz = pytz.timezone("Europe/Copenhagen")
 
-# === ФУНКЦИИ ===
+BASE_URL = "https://www.forexfactory.com/calendar"
 
-def safe_request(url):
-    try:
-        response = requests.get(url)
+# ===== ПАРСИНГ =====
 
-        if response.status_code != 200:
-            print("Bad response:", response.status_code)
-            return []
+def get_calendar():
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(BASE_URL, headers=headers)
 
-        if not response.text:
-            print("Empty response")
-            return []
+    soup = BeautifulSoup(response.text, "html.parser")
+    rows = soup.select("tr.calendar__row")
 
-        return response.json()
+    events = []
+    current_time = None
 
-    except Exception as e:
-        print("Request error:", e)
-        return []
-        
-def get_today_news():
-    url = f"https://api.tradingeconomics.com/calendar/country/all?c={API_KEY}"
-    data = safe_request(url)
-    
-    today = datetime.now(tz).date()
-    news = []
+    for row in rows:
+        time_cell = row.select_one(".calendar__time")
+        impact = row.select_one(".calendar__impact span")
 
-    for item in data:
-        if item.get("Importance") != 3:
+        if time_cell and time_cell.text.strip():
+            current_time = time_cell.text.strip()
+
+        if not impact:
             continue
 
-        date = datetime.fromisoformat(item['Date'].replace("Z", ""))
-        date = date.replace(tzinfo=pytz.utc).astimezone(tz)
+        impact_class = impact.get("class", [])
+        if "high" not in " ".join(impact_class).lower():
+            continue
 
-        if date.date() == today:
-            item["local_time"] = date.strftime("%H:%M")
-            news.append(item)
+        currency = row.select_one(".calendar__currency")
+        event = row.select_one(".calendar__event")
+        actual = row.select_one(".calendar__actual")
+        forecast = row.select_one(".calendar__forecast")
+        previous = row.select_one(".calendar__previous")
 
-    return news
+        events.append({
+            "time": current_time,
+            "currency": currency.text.strip() if currency else "",
+            "event": event.text.strip() if event else "",
+            "actual": actual.text.strip() if actual else "",
+            "forecast": forecast.text.strip() if forecast else "",
+            "previous": previous.text.strip() if previous else "",
+        })
 
+    return events
 
-def get_holidays():
-    url = f"https://api.tradingeconomics.com/calendar/country/all?c={API_KEY}"
-    data = safe_request(url)
+# ===== УТРО =====
 
-    today = datetime.now(tz).date()
-    holidays = []
+def send_morning():
+    print("Morning report...")
 
-    for item in data:
-        date = datetime.fromisoformat(item['Date'].replace("Z", ""))
-        date = date.date()
+    events = get_calendar()
 
-        if date == today:
-            holidays.append(item['Country'])
+    today = datetime.now(tz)
 
-    return list(set(holidays))
+    message = "🌍 *Daily Macro Briefing*\n"
+    message += today.strftime("%A, %d %B") + "\n\n"
 
+    if today.weekday() >= 5:
+        message += "🛑 Weekend — no major events."
+        bot.send_message(CHAT_ID, message, parse_mode="Markdown")
+        return
 
-def send_morning_report():
-    print("Sending morning report...")
-
-    news = get_today_news()
-    holidays = get_holidays()
-
-    message = "🌍 *Daily Macro Briefing*\n\n"
-
-    # Holidays
-    if holidays:
-        message += "🏦 *Bank Holidays:*\n"
-        for h in holidays:
-            message += f"• {h}\n"
-        message += "\n"
-
-    # News
-    if not news:
-        message += "✅ No high-impact economic events scheduled today."
+    if not events:
+        message += "✅ No high-impact events today."
     else:
-        message += "📊 *High Impact Events Today:*\n\n"
-        for n in news:
-            message += f"🕒 {n['local_time']} | {n['Country']}\n{n['Event']}\n\n"
+        message += "📊 *High Impact Events:*\n\n"
+        for e in events:
+            message += f"🕒 {e['time']} | {e['currency']}\n{e['event']}\n\n"
 
     bot.send_message(CHAT_ID, message, parse_mode="Markdown")
 
+# ===== РЕЛИЗЫ =====
 
-def check_releases():
+def check_news():
     sent = set()
 
     while True:
         try:
-            url = f"https://api.tradingeconomics.com/calendar/country/all?c={API_KEY}"
-            data = safe_request(url)
+            events = get_calendar()
 
-            now = datetime.now(tz)
+            for e in events:
+                key = e['event'] + e['time']
 
-            for n in data:
-                if n.get("Importance") != 3:
-                    continue
+                if e['actual'] and key not in sent:
+                    msg = (
+                        f"📢 *{e['event']}*\n"
+                        f"🌍 {e['currency']}\n"
+                        f"🕒 {e['time']}\n\n"
+                        f"Actual: {e['actual']}\n"
+                        f"Forecast: {e['forecast']}\n"
+                        f"Previous: {e['previous']}"
+                    )
 
-                # нормальная работа с датой
-                event_time = datetime.fromisoformat(n['Date'].replace("Z", ""))
-                event_time = event_time.replace(tzinfo=pytz.utc).astimezone(tz)
+                    bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
+                    sent.add(key)
 
-                # проверяем только сегодняшние
-                if event_time.date() != now.date():
-                    continue
-
-                # проверяем что уже вышло
-                if event_time <= now:
-                    key = n['Event'] + str(event_time)
-
-                    if key not in sent and n['Actual'] is not None:
-                        msg = (
-                            f"📢 *{n['Event']}*\n"
-                            f"🌍 {n['Country']}\n"
-                            f"🕒 {event_time.strftime('%H:%M')}\n\n"
-                            f"Actual: {n['Actual']}\n"
-                            f"Forecast: {n['Forecast']}\n"
-                            f"Previous: {n['Previous']}"
-                        )
-
-                        bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
-                        sent.add(key)
-
-            time.sleep(120)
+            time.sleep(60)
 
         except Exception as e:
             print("Error:", e)
             time.sleep(120)
-            
+
+# ===== ПЛАНИРОВЩИК =====
+
 def scheduler():
     last_sent = None
 
     while True:
-        try:
-            now = datetime.now(tz)
+        now = datetime.now(tz)
 
-            # только будни
-            if now.weekday() < 5:
-                if now.hour == 8 and last_sent != now.date():
-                    send_morning_report()
-                    last_sent = now.date()
+        if now.hour == 8 and last_sent != now.date():
+            send_morning()
+            last_sent = now.date()
 
-            time.sleep(60)
+        time.sleep(30)
 
-        except Exception as e:
-            print("Error in scheduler:", e)
-            time.sleep(60)
+# ===== ТЕСТ =====
 
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.send_message(message.chat.id, "✅ Bot is running")
 
-# === ЗАПУСК ===
+# ===== ЗАПУСК =====
+
 import threading
 
 print("Bot started...")
 
-threading.Thread(target=check_releases).start()
+threading.Thread(target=check_news).start()
 threading.Thread(target=scheduler).start()
 
 bot.infinity_polling(skip_pending=True)
