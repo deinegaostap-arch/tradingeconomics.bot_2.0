@@ -35,7 +35,7 @@ def safe_request(url):
 def get_today_news():
     url = f"https://api.tradingeconomics.com/calendar?c={API_KEY}"
     data = safe_request(url)
-
+    
     today = datetime.now(tz).date()
     news = []
 
@@ -102,7 +102,7 @@ def check_releases():
     while True:
         try:
             url = f"https://api.tradingeconomics.com/calendar?c={API_KEY}"
-           data = safe_request(url)
+            data = safe_request(url)
 
             now = datetime.now(tz)
 
