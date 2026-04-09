@@ -83,24 +83,32 @@ def check_releases():
 
     while True:
         try:
-            news = get_today_news()
+            url = f"https://api.tradingeconomics.com/calendar?c={API_KEY}"
+            data = requests.get(url).json()
+
             now = datetime.now(tz)
 
-            for n in news:
-                event_time = datetime.strptime(n['local_time'], "%H:%M")
-                event_time = event_time.replace(
-                    year=now.year, month=now.month, day=now.day, tzinfo=tz
-                )
+            for n in data:
+                if n.get("Importance") != 3:
+                    continue
 
-                diff = abs((now - event_time).total_seconds())
+                # нормальная работа с датой
+                event_time = datetime.fromisoformat(n['Date'].replace("Z", ""))
+                event_time = event_time.replace(tzinfo=pytz.utc).astimezone(tz)
 
-                if diff < 90:
-                    key = n['Event']
+                # проверяем только сегодняшние
+                if event_time.date() != now.date():
+                    continue
 
-                    if key not in sent:
+                # проверяем что уже вышло
+                if event_time <= now:
+                    key = n['Event'] + str(event_time)
+
+                    if key not in sent and n['Actual'] is not None:
                         msg = (
                             f"📢 *{n['Event']}*\n"
-                            f"🌍 {n['Country']}\n\n"
+                            f"🌍 {n['Country']}\n"
+                            f"🕒 {event_time.strftime('%H:%M')}\n\n"
                             f"Actual: {n['Actual']}\n"
                             f"Forecast: {n['Forecast']}\n"
                             f"Previous: {n['Previous']}"
@@ -109,13 +117,11 @@ def check_releases():
                         bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
                         sent.add(key)
 
-            time.sleep(30)
+            time.sleep(20)
 
         except Exception as e:
-            print("Error in check_releases:", e)
+            print("Error:", e)
             time.sleep(60)
-
-
 def scheduler():
     last_sent = None
 
