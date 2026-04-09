@@ -151,4 +151,4 @@ print("Bot started...")
 threading.Thread(target=check_releases).start()
 threading.Thread(target=scheduler).start()
 
-bot.infinity_polling()
+bot.infinity_polling(skip_pending=True)
