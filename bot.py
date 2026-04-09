@@ -65,11 +65,11 @@ def send_morning():
 
     today = datetime.now(tz)
 
-    message = "🌍 *Daily Macro Briefing*\n"
+    message = "🌍 *DAILY MACRO BRIEFING*\n"
     message += today.strftime("%A, %d %B") + "\n\n"
 
     if today.weekday() >= 5:
-        message += "🛑 Weekend — no major events."
+        message += "Weekend — no major events."
         bot.send_message(CHAT_ID, message, parse_mode="Markdown")
         return
 
@@ -78,7 +78,7 @@ def send_morning():
     else:
         message += "📊 *High Impact Events:*\n\n"
         for e in events:
-            message += f"🕒 {e['time']} | {e['currency']}\n{e['event']}\n\n"
+            message += f"{e['time']} | {e['currency']}\n{e['event']}\n\n"
 
     bot.send_message(CHAT_ID, message, parse_mode="Markdown")
 
@@ -98,7 +98,6 @@ def check_news():
                     msg = (
                         f"📢 *{e['event']}*\n"
                         f"🌍 {e['currency']}\n"
-                        f"🕒 {e['time']}\n\n"
                         f"Actual: {e['actual']}\n"
                         f"Forecast: {e['forecast']}\n"
                         f"Previous: {e['previous']}"
