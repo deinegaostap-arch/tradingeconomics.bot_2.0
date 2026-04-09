@@ -122,6 +122,7 @@ def check_releases():
         except Exception as e:
             print("Error:", e)
             time.sleep(60)
+            
 def scheduler():
     last_sent = None
 
