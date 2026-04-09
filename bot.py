@@ -14,9 +14,27 @@ tz = pytz.timezone("Europe/Copenhagen")
 
 # === ФУНКЦИИ ===
 
+def safe_request(url):
+    try:
+        response = requests.get(url)
+
+        if response.status_code != 200:
+            print("Bad response:", response.status_code)
+            return []
+
+        if not response.text:
+            print("Empty response")
+            return []
+
+        return response.json()
+
+    except Exception as e:
+        print("Request error:", e)
+        return []
+        
 def get_today_news():
     url = f"https://api.tradingeconomics.com/calendar?c={API_KEY}"
-    data = requests.get(url).json()
+    data = safe_request(url)
 
     today = datetime.now(tz).date()
     news = []
@@ -37,7 +55,7 @@ def get_today_news():
 
 def get_holidays():
     url = f"https://api.tradingeconomics.com/holiday?c={API_KEY}"
-    data = requests.get(url).json()
+    data = safe_request(url)
 
     today = datetime.now(tz).date()
     holidays = []
@@ -84,7 +102,7 @@ def check_releases():
     while True:
         try:
             url = f"https://api.tradingeconomics.com/calendar?c={API_KEY}"
-            data = requests.get(url).json()
+           data = safe_request(url)
 
             now = datetime.now(tz)
 
@@ -117,7 +135,7 @@ def check_releases():
                         bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
                         sent.add(key)
 
-            time.sleep(20)
+            time.sleep(60)
 
         except Exception as e:
             print("Error:", e)
@@ -136,7 +154,7 @@ def scheduler():
                     send_morning_report()
                     last_sent = now.date()
 
-            time.sleep(30)
+            time.sleep(60)
 
         except Exception as e:
             print("Error in scheduler:", e)
