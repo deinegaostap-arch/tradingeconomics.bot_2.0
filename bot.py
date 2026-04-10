@@ -24,14 +24,26 @@ def get_calendar():
 
     events = []
     current_time = None
+    current_date = None
+
+    today = datetime.now(tz).strftime("%b %d")
 
     for row in rows:
-        time_cell = row.select_one(".calendar__time")
-        impact = row.select_one(".calendar__impact span")
+        # ДАТА (ключевой фикс)
+        date_cell = row.select_one(".calendar__date")
+        if date_cell and date_cell.text.strip():
+            current_date = date_cell.text.strip()
 
+        if current_date and today not in current_date:
+            continue
+
+        # ВРЕМЯ
+        time_cell = row.select_one(".calendar__time")
         if time_cell and time_cell.text.strip():
             current_time = time_cell.text.strip()
 
+        # IMPACT
+        impact = row.select_one(".calendar__impact span")
         if not impact:
             continue
 
@@ -55,7 +67,7 @@ def get_calendar():
         })
 
     return events
-
+    
 # ===== УТРО =====
 
 def send_morning():
